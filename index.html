@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>战机隐身材料阻抗匹配仿真</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #eee;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 8px;
+    color: #4fc3f7;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #90a4ae;
+    margin-bottom: 25px;
+  }
+
+  /* 战机选择栏 */
+  .craft-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .craft-btn {
+    padding: 10px 16px;
+    border: 2px solid #37474f;
+    border-radius: 8px;
+    background: rgba(55, 71, 79, 0.3);
+    color: #cfd8dc;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 13px;
+    text-align: center;
+    min-width: 85px;
+  }
+  .craft-btn:hover { border-color: #4fc3f7; }
+  .craft-btn.active {
+    border-color: #4fc3f7;
+    background: rgba(79, 195, 247, 0.15);
+    color: #4fc3f7;
+    font-weight: bold;
+  }
+  .craft-btn .craft-sub {
+    display: block;
+    font-size: 10px;
+    color: #78909c;
+    margin-top: 3px;
+  }
+  .craft-btn.active .craft-sub { color: #4fc3f7; }
+
+  /* 材料信息两列 */
+  .material-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .col-title {
+    font-size: 14px;
+    color: #b0bec5;
+    margin-bottom: 10px;
+    padding-left: 10px;
+    border-left: 3px solid #4fc3f7;
+  }
+  .col-title.right { border-left-color: #ff9800; }
+  .mat-card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid rgba(79,195,247,0.2);
+  }
+  .col-right .mat-card { border-color: rgba(255,152,0,0.2); }
+  .mat-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4fc3f7;
+    margin-bottom: 8px;
+  }
+  .col-right .mat-name { color: #ff9800; }
+  .mat-detail {
+    font-size: 12px;
+    color: #90a4ae;
+    line-height: 1.8;
+  }
+  .mat-detail span {
+    color: #cfd8dc;
+    font-family: monospace;
+    font-size: 13px;
+  }
+
+  /* 调节面板 */
+  .control-panel {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 20px 25px;
+    margin-bottom: 20px;
+  }
+  .control-title {
+    font-size: 15px;
+    color: #b0bec5;
+    margin-bottom: 15px;
+    padding-left: 10px;
+    border-left: 3px solid #9c27b0;
+  }
+  .control-title.two { border-left-color: #e91e63; }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  .slider-row:last-child { margin-bottom: 0; }
+  .slider-label {
+    min-width: 90px;
+    font-size: 13px;
+    color: #b0bec5;
+  }
+  .slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    outline: none;
+  }
+  .slider.ratio { background: linear-gradient(to right, #4fc3f7, #9c27b0, #ff9800); }
+  .slider.thick { background: linear-gradient(to right, #e91e63, #9c27b0, #4fc3f7); }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .slider.ratio::-webkit-slider-thumb { border: 3px solid #9c27b0; }
+  .slider.thick::-webkit-slider-thumb { border: 3px solid #e91e63; }
+  .slider-value {
+    min-width: 110px;
+    text-align: right;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .slider-value.ratio { color: #ce93d8; }
+  .slider-value.thick { color: #f48fb1; }
+  .slider-legend {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #78909c;
+    padding-left: 90px;
+  }
+
+  /* 分隔线 */
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 18px 0;
+  }
+
+  /* 等效参数 */
+  .param-panel {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 18px 25px;
+    margin-bottom: 20px;
+  }
+  .param-title {
+    font-size: 14px;
+    color: #b0bec5;
+    margin-bottom: 12px;
+  }
+  .param-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    text-align: center;
+  }
+  .param-item .p-label {
+    font-size: 12px;
+    color: #78909c;
+    margin-bottom: 4px;
+  }
+  .param-item .p-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #4fc3f7;
+    font-family: "Cambria Math", serif;
+  }
+
+  /* 匹配结果 */
+  .result-panel {
+    background: rgba(76, 175, 80, 0.08);
+    border: 2px solid rgba(76, 175, 80, 0.3);
+    border-radius: 12px;
+    padding: 25px;
+    text-align: center;
+    transition: all 0.5s;
+  }
+  .result-label {
+    font-size: 14px;
+    color: #a5d6a7;
+    margin-bottom: 8px;
+  }
+  .result-formula {
+    font-size: 14px;
+    color: #c8e6c9;
+    font-family: "Cambria Math", serif;
+    margin-bottom: 10px;
+  }
+  .result-value {
+    font-size: 52px;
+    font-weight: bold;
+    font-family: "Cambria Math", serif;
+    margin-bottom: 12px;
+    transition: color 0.5s;
+  }
+  .match-bar {
+    width: 100%;
+    height: 22px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 11px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 8px;
+  }
+  .match-bar-fill {
+    height: 100%;
+    border-radius: 11px;
+    transition: all 0.5s ease;
+    background: linear-gradient(90deg, #f44336, #ff9800, #ffeb3b, #4caf50);
+  }
+  .match-bar-marker {
+    position: absolute;
+    top: -3px;
+    width: 3px;
+    height: 28px;
+    background: #fff;
+    border-radius: 2px;
+    transition: left 0.5s ease;
+    box-shadow: 0 0 6px rgba(255,255,255,0.5);
+  }
+  .match-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #78909c;
+  }
+  .match-level {
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 12px;
+    letter-spacing: 2px;
+  }
+
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: #546e7a;
+    margin-top: 25px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🛩️ 战机隐身材料阻抗匹配仿真</h1>
+  <p class="subtitle">选择战机 → 查看材料体系 → 调节比例与厚度 → 观察阻抗匹配</p>
+
+  <!-- 战机型号选择 -->
+  <div class="craft-selector">
+    <div class="craft-btn active" data-craft="0">
+      歼-8
+      <span class="craft-sub">第二代</span>
+    </div>
+    <div class="craft-btn" data-craft="1">
+      歼-10
+      <span class="craft-sub">第三代</span>
+    </div>
+    <div class="craft-btn" data-craft="2">
+      歼-11B
+      <span class="craft-sub">三代半</span>
+    </div>
+    <div class="craft-btn" data-craft="3">
+      歼-20
+      <span class="craft-sub">第四代</span>
+    </div>
+    <div class="craft-btn" data-craft="4">
+      歼-35
+      <span class="craft-sub">新一代</span>
+    </div>
+  </div>
+
+  <!-- 材料信息两列 -->
+  <div class="material-columns">
+    <div class="col-left">
+      <div class="col-title">介电型材料</div>
+      <div class="mat-card">
+        <div class="mat-name" id="dName">环氧树脂基体</div>
+        <div class="mat-detail">
+          介电常数 εr = <span id="dEr">4.0</span><br>
+          损耗角正切 tanδ = <span id="dTand">0.02</span><br>
+          特点：<span id="dDesc">低损耗基体材料</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-right">
+      <div class="col-title right">磁性材料</div>
+      <div class="mat-card">
+        <div class="mat-name" id="mName">铁氧体涂层</div>
+        <div class="mat-detail">
+          磁导率 μr = <span id="mMur">6.0</span><br>
+          损耗角正切 tanδ = <span id="mTand">0.50</span><br>
+          特点：<span id="mDesc">磁损耗为主，中低频吸收</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调节面板 -->
+  <div class="control-panel">
+    <!-- 第一行：混合比例 -->
+    <div class="control-title">混合比例调节</div>
+    <div class="slider-row">
+      <span class="slider-label">体积分数</span>
+      <input type="range" class="slider ratio" id="ratioSlider" min="0" max="100" step="1" value="70">
+      <span class="slider-value ratio" id="ratioVal">介电 30% : 磁 70%</span>
+    </div>
+    <div class="slider-legend">
+      <span style="color:#4fc3f7;">← 纯介电</span>
+      <span>1:1</span>
+      <span style="color:#ff9800;">纯磁性 →</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 第二行：厚度 -->
+    <div class="control-title two">涂层厚度调节</div>
+    <div class="slider-row">
+      <span class="slider-label">涂层厚度</span>
+      <input type="range" class="slider thick" id="thickSlider" min="0.5" max="8" step="0.1" value="2.5">
+      <span class="slider-value thick" id="thickVal">2.5 mm</span>
+    </div>
+    <div class="slider-legend">
+      <span>0.5 mm</span>
+      <span>4.25 mm</span>
+      <span>8.0 mm</span>
+    </div>
+  </div>
+
+  <!-- 等效参数 -->
+  <div class="param-panel">
+    <div class="param-title">等效电磁参数（Lichtenecker 对数混合公式）</div>
+    <div class="param-grid">
+      <div class="param-item">
+        <div class="p-label">等效介电常数 ε<sub>r,eff</sub></div>
+        <div class="p-value" id="effEr">6.3</div>
+      </div>
+      <div class="param-item">
+        <div class="p-label">等效磁导率 μ<sub>r,eff</sub></div>
+        <div class="p-value" id="effMur">3.8</div>
+      </div>
+      <div class="param-item">
+        <div class="p-label">损耗角正切 tanδ<sub>eff</sub></div>
+        <div class="p-value" id="effTand">0.36</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 匹配结果 -->
+  <div class="result-panel" id="resultPanel">
+    <div class="result-label">阻抗匹配比</div>
+    <div class="result-formula">
+      √(μ<sub>r,eff</sub> / ε<sub>r,eff</sub>) = √(<span id="fMur">3.8</span> / <span id="fEr">6.3</span>)
+    </div>
+    <div class="result-value" id="matchValue">0.78</div>
+    
+    <div class="match-bar">
+      <div class="match-bar-fill" id="matchBarFill" style="width: 39%"></div>
+      <div class="match-bar-marker" id="matchMarker" style="left: 39%"></div>
+    </div>
+    <div class="match-bar-labels">
+      <span>0</span>
+      <span>0.5</span>
+      <span>1.0（完美匹配）</span>
+      <span>1.5</span>
+      <span>2.0</span>
+    </div>
+    
+    <div class="match-level" id="matchLevel" style="color: #8bc34a;">匹配良好</div>
+  </div>
+
+  <div class="footer">基于 Lichtenecker 对数混合法则 · 阻抗匹配原理教学演示</div>
+</div>
+
+<script>
+// 战机材料体系数据
+const crafts = [
+  {
+    name: "歼-8",
+    gen: "第二代",
+    dielectric: {
+      name: "环氧树脂基体",
+      er: 4.0,
+      tand: 0.02,
+      desc: "低损耗基体材料"
+    },
+    magnetic: {
+      name: "铁氧体涂层",
+      mur: 6.0,
+      tand: 0.50,
+      desc: "磁损耗为主，中低频吸收"
+    },
+    defaultRatio: 70, // 磁性材料占比
+    defaultThick: 2.5
+  },
+  {
+    name: "歼-10",
+    gen: "第三代",
+    dielectric: {
+      name: "碳纤维复合材料",
+      er: 25,
+      tand: 0.35,
+      desc: "结构-功能一体化"
+    },
+    magnetic: {
+      name: "铁氧体填料",
+      mur: 6.0,
+      tand: 0.50,
+      desc: "混合填充，改善匹配"
+    },
+    defaultRatio: 50,
+    defaultThick: 3.0
+  },
+  {
+    name: "歼-11B",
+    gen: "三代半",
+    dielectric: {
+      name: "碳纤维增强复合材料",
+      er: 22,
+      tand: 0.30,
+      desc: "大面积结构吸波"
+    },
+    magnetic: {
+      name: "金属微粉（羰基铁）",
+      mur: 20,
+      tand: 0.70,
+      desc: "高磁损耗，薄层高吸收"
+    },
+    defaultRatio: 60,
+    defaultThick: 2.0
+  },
+  {
+    name: "歼-20",
+    gen: "第四代",
+    dielectric: {
+      name: "超材料介质 + 石墨烯",
+      er: 45,
+      tand: 0.75,
+      desc: "人工结构，高介电损耗"
+    },
+    magnetic: {
+      name: "超材料磁谐振结构",
+      mur: 12,
+      tand: 0.80,
+      desc: "人工磁导体，磁电协同"
+    },
+    defaultRatio: 50,
+    defaultThick: 2.0
+  },
+  {
+    name: "歼-35",
+    gen: "新一代",
+    dielectric: {
+      name: "石墨烯复合薄膜",
+      er: 35,
+      tand: 0.60,
+      desc: "超薄轻质，高损耗"
+    },
+    magnetic: {
+      name: "超材料磁结构",
+      mur: 15,
+      tand: 0.85,
+      desc: "宽带磁响应，智能可调"
+    },
+    defaultRatio: 55,
+    defaultThick: 1.8
+  }
+];
+
+let currentCraft = 0;
+const ratioSlider = document.getElementById('ratioSlider');
+const thickSlider = document.getElementById('thickSlider');
+const ratioVal = document.getElementById('ratioVal');
+const thickVal = document.getElementById('thickVal');
+
+// 切换战机
+function setCraft(idx) {
+  currentCraft = idx;
+  const c = crafts[idx];
+  
+  // 更新材料卡片
+  document.getElementById('dName').textContent = c.dielectric.name;
+  document.getElementById('dEr').textContent = c.dielectric.er.toFixed(1);
+  document.getElementById('dTand').textContent = c.dielectric.tand.toFixed(2);
+  document.getElementById('dDesc').textContent = c.dielectric.desc;
+  
+  document.getElementById('mName').textContent = c.magnetic.name;
+  document.getElementById('mMur').textContent = c.magnetic.mur.toFixed(1);
+  document.getElementById('mTand').textContent = c.magnetic.tand.toFixed(2);
+  document.getElementById('mDesc').textContent = c.magnetic.desc;
+  
+  // 设置默认比例和厚度
+  ratioSlider.value = c.defaultRatio;
+  thickSlider.value = c.defaultThick;
+  
+  update();
+}
+
+// Lichtenecker 对数混合公式
+function calcEffective(er1, mur1, tand1, er2, mur2, tand2, f1) {
+  const f2 = 1 - f1;
+  const lnErEff = f1 * Math.log(er1) + f2 * Math.log(er2);
+  const erEff = Math.exp(lnErEff);
+  const lnMurEff = f1 * Math.log(mur1) + f2 * Math.log(mur2);
+  const murEff = Math.exp(lnMurEff);
+  const tandEff = f1 * tand1 + f2 * tand2;
+  return { erEff, murEff, tandEff };
+}
+
+function update() {
+  const c = crafts[currentCraft];
+  const fMag = ratioSlider.value / 100;
+  const fDi = 1 - fMag;
+  const d = thickSlider.value;
+
+  // 介电材料：μr≈1；磁性材料：εr≈10（基底值）
+  const eff = calcEffective(
+    c.dielectric.er, 1, c.dielectric.tand,
+    10, c.magnetic.mur, c.magnetic.tand,
+    fDi
+  );
+
+  // 更新显示
+  ratioVal.textContent = `介电 ${(fDi*100).toFixed(0)}% : 磁 ${(fMag*100).toFixed(0)}%`;
+  thickVal.textContent = d + ' mm';
+
+  document.getElementById('effEr').textContent = eff.erEff.toFixed(1);
+  document.getElementById('effMur').textContent = eff.murEff.toFixed(1);
+  document.getElementById('effTand').textContent = eff.tandEff.toFixed(2);
+
+  // 阻抗匹配比
+  const ratio = Math.sqrt(eff.murEff / eff.erEff);
+  document.getElementById('matchValue').textContent = ratio.toFixed(2);
+  document.getElementById('fEr').textContent = eff.erEff.toFixed(1);
+  document.getElementById('fMur').textContent = eff.murEff.toFixed(1);
+
+  const barPercent = Math.min(ratio / 2 * 100, 100);
+  document.getElementById('matchBarFill').style.width = barPercent + '%';
+  document.getElementById('matchMarker').style.left = barPercent + '%';
+
+  const diff = Math.abs(ratio - 1);
+  let level, color;
+  if (diff < 0.08) {
+    level = "★ 完美匹配 ★";
+    color = "#4caf50";
+  } else if (diff < 0.2) {
+    level = "匹配良好";
+    color = "#8bc34a";
+  } else if (diff < 0.4) {
+    level = "匹配一般";
+    color = "#ff9800";
+  } else {
+    level = "匹配较差";
+    color = "#f44336";
+  }
+  document.getElementById('matchLevel').textContent = level;
+  document.getElementById('matchLevel').style.color = color;
+  document.getElementById('matchValue').style.color = color;
+  document.getElementById('resultPanel').style.borderColor = color + '66';
+}
+
+// 战机按钮事件
+document.querySelectorAll('.craft-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.craft-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setCraft(parseInt(btn.dataset.craft));
+  });
+});
+
+ratioSlider.addEventListener('input', update);
+thickSlider.addEventListener('input', update);
+
+// 初始化
+setCraft(0);
+</script>
+</body>
+</html>
